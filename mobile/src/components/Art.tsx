@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { Image, View, Text } from 'react-native';
+import { PRODUCT_IMAGES } from '../productImages';
 import Svg, { Path, Circle, Rect, Defs, LinearGradient, Stop, G, Text as SvgText } from 'react-native-svg';
 import { MOODS } from '../data';
 
@@ -79,14 +80,25 @@ export function BrandLogo({ compact = false }: { compact?: boolean }) {
 }
 
 export function ContainerArt({
+  productId,
   type,
   visual,
   height = 112,
 }: {
+  productId?: number;
   type: 'glass' | 'pet' | 'keg';
   visual: { top: string; bottom: string; bottle?: string };
   height?: number;
 }) {
+  if (productId && PRODUCT_IMAGES[productId]) {
+    return (
+      <Image
+        source={PRODUCT_IMAGES[productId]}
+        style={{ width: height * 0.9, height }}
+        resizeMode="contain"
+      />
+    );
+  }
   const { top, bottom, bottle = '#5C2C0C' } = visual;
 
   if (type === 'keg') {
