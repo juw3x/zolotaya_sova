@@ -1,0 +1,180 @@
+import { StyleSheet } from 'react-native';
+
+export type ThemeMode = 'dark' | 'light';
+
+export interface ThemePalette {
+  bg: string;
+  surface: string;
+  surfaceAlt: string;
+  border: string;
+  text: string;
+  textSecondary: string;
+  textMuted: string;
+  accent: string;
+  accentText: string;
+  chipActiveBg: string;
+  chipActiveText: string;
+  tabBg: string;
+}
+
+export const THEMES: Record<ThemeMode, ThemePalette> = {
+  dark: {
+    bg: '#191816',
+    surface: '#23201D',
+    surfaceAlt: '#2B2723',
+    border: '#322E29',
+    text: '#FFFFFF',
+    textSecondary: '#D4CFC7',
+    textMuted: '#9E9689',
+    accent: '#CFA052',
+    accentText: '#191816',
+    chipActiveBg: '#CFA052',
+    chipActiveText: '#191816',
+    tabBg: '#191816',
+  },
+  light: {
+    bg: '#FFFFFF',
+    surface: '#F3F1ED',
+    surfaceAlt: '#FAF8F4',
+    border: '#ECE9E2',
+    text: '#191816',
+    textSecondary: '#4A4640',
+    textMuted: '#7D776E',
+    accent: '#CFA052',
+    accentText: '#191816',
+    chipActiveBg: '#191816',
+    chipActiveText: '#FFFFFF',
+    tabBg: '#FFFFFF',
+  },
+};
+
+export const s = StyleSheet.create({
+  root: { flex: 1 },
+  darkScreen: { flex: 1, justifyContent: 'center', padding: 28 },
+  ageBox: { alignItems: 'center' },
+  brandSub: { fontFamily: 'Inter_400Regular', fontSize: 11, letterSpacing: 2, marginTop: 10 },
+  ochreLine: { width: 48, height: 2, backgroundColor: '#CFA052', marginVertical: 22 },
+  ageText: { fontFamily: 'Inter_400Regular', fontSize: 14, textAlign: 'center', lineHeight: 21, marginBottom: 26 },
+  ochreBtn: { backgroundColor: '#CFA052', paddingVertical: 14, paddingHorizontal: 26, alignItems: 'center' },
+  ochreBtnText: { fontFamily: 'Oswald_600SemiBold', fontSize: 14, color: '#191816', letterSpacing: 1.2 },
+
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  themeIconBtn: { width: 32, height: 32, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
+  themeIconText: { fontSize: 15 },
+  navChip: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  navChipText: { fontFamily: 'Oswald_500Medium', fontSize: 11, letterSpacing: 1 },
+  dotsGrid: { width: 12, height: 12, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignContent: 'space-between' },
+  dotSq: { width: 4, height: 4 },
+  burgerWrap: { width: 20, height: 10, justifyContent: 'space-between' },
+  burgerLine: { height: 2, width: 20 },
+
+  homeWrap: { padding: 20, paddingBottom: 110 },
+  storeBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, paddingBottom: 10, marginBottom: 20 },
+  storeBannerText: { fontFamily: 'Inter_400Regular', fontSize: 12, flex: 1 },
+  storeBannerAction: { fontFamily: 'Oswald_500Medium', fontSize: 11, color: '#CFA052', letterSpacing: 1 },
+  heroTitle: { fontFamily: 'Inter_700Bold', fontSize: 30, lineHeight: 36 },
+  underlinedLink: { alignSelf: 'flex-start', marginTop: 18, marginBottom: 28 },
+  underlinedLinkText: { fontFamily: 'Inter_600SemiBold', fontSize: 12, letterSpacing: 1.5 },
+  underlinedBar: { height: 2, backgroundColor: '#CFA052', marginTop: 6 },
+  ochreCard: { backgroundColor: '#CFA052', padding: 20, marginBottom: 14 },
+  ochreCardKicker: { fontFamily: 'Inter_600SemiBold', fontSize: 10, color: '#F7EFE0', letterSpacing: 1.5, marginBottom: 8 },
+  ochreCardTitle: { fontFamily: 'Inter_700Bold', fontSize: 18, color: '#FFFFFF', lineHeight: 24 },
+  ochreArrow: { fontSize: 20, color: '#FFFFFF', marginTop: 12 },
+  scrollCueWrap: { alignItems: 'center', marginTop: 18 },
+  scrollCueLine: { width: 1.5, height: 44, backgroundColor: '#CFA052' },
+  scrollCueCircle: { width: 14, height: 14, borderRadius: 7, borderWidth: 1, borderColor: '#CFA052', marginTop: -4 },
+
+  aboutWrap: { padding: 20, paddingBottom: 120 },
+  aboutBack: { alignSelf: 'flex-start', marginBottom: 16 },
+  aboutBackText: { fontFamily: 'Oswald_500Medium', fontSize: 12, color: '#CFA052', letterSpacing: 1 },
+  aboutKicker: { fontFamily: 'Oswald_500Medium', fontSize: 11, color: '#CFA052', letterSpacing: 1.6, marginTop: 12 },
+  aboutLead: { fontFamily: 'Inter_400Regular', fontSize: 14, lineHeight: 22, marginTop: 10 },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginTop: 20, marginBottom: 8 },
+  statCard: { width: '48.5%', padding: 14, marginBottom: 10, borderLeftWidth: 2, borderLeftColor: '#CFA052' },
+  statNum: { fontFamily: 'Oswald_600SemiBold', fontSize: 24, color: '#CFA052' },
+  statLabel: { fontFamily: 'Inter_400Regular', fontSize: 12, marginTop: 4 },
+  aboutSection: { padding: 16, marginTop: 12, borderWidth: 1 },
+  aboutSectionTitle: { fontFamily: 'Oswald_600SemiBold', fontSize: 15, letterSpacing: 0.8, marginBottom: 6 },
+  aboutSectionText: { fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 20 },
+
+  catalogLayout: { flex: 1, flexDirection: 'row' },
+  sidebar: { width: 112, borderRightWidth: 1, paddingVertical: 12 },
+  sideItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 9, paddingHorizontal: 8 },
+  sideDash: { width: 10, height: 1.5, backgroundColor: '#CFA052', marginRight: 6 },
+  sideText: { fontFamily: 'Oswald_500Medium', fontSize: 11, flexShrink: 1, textTransform: 'uppercase' },
+  feed: { flex: 1, paddingHorizontal: 10 },
+  catBlock: { paddingTop: 14, paddingBottom: 8 },
+  catHeader: { fontFamily: 'Oswald_600SemiBold', fontSize: 15, letterSpacing: 1, marginBottom: 10 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  card: { width: '48.5%', marginBottom: 16 },
+  pedestal: { height: 132, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
+  cardTitle: { fontFamily: 'Oswald_600SemiBold', fontSize: 13, letterSpacing: 0.4 },
+  cardSub: { fontFamily: 'Oswald_400Regular', fontSize: 11, color: '#CFA052', marginTop: 2 },
+  cardPrice: { fontFamily: 'Inter_700Bold', fontSize: 13, marginTop: 4 },
+
+  wheelWrap: { padding: 20, alignItems: 'center', paddingBottom: 110 },
+  pageTitle: { fontFamily: 'Oswald_600SemiBold', fontSize: 26, letterSpacing: 1 },
+  pageSub: { fontFamily: 'Inter_400Regular', fontSize: 13, marginTop: 4, marginBottom: 16, textAlign: 'center' },
+  pointer: { width: 0, height: 0, borderLeftWidth: 10, borderRightWidth: 10, borderTopWidth: 16, borderLeftColor: 'transparent', borderRightColor: 'transparent', marginBottom: -8, zIndex: 10 },
+  wheelContainer: { width: 270, height: 270, justifyContent: 'center', alignItems: 'center', marginVertical: 6 },
+  wheelCenter: { position: 'absolute', width: 74, height: 74, borderRadius: 37, backgroundColor: '#191816', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#CFA052' },
+  wheelSpinText: { fontFamily: 'Oswald_600SemiBold', fontSize: 9, color: '#D89F5C', marginTop: 1 },
+  moodChips: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 14 },
+  moodChip: { borderWidth: 1, paddingHorizontal: 12, paddingVertical: 6 },
+  moodChipText: { fontFamily: 'Oswald_500Medium', fontSize: 11 },
+  recRow: { flexDirection: 'row', alignItems: 'center', padding: 12, marginBottom: 10 },
+
+  storesWrap: { padding: 20, paddingBottom: 110 },
+  storesHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  greenBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#194D33', justifyContent: 'center', alignItems: 'center' },
+  greenBadgeText: { fontFamily: 'Inter_700Bold', fontSize: 13, color: '#D89F5C' },
+  storeRow: { paddingVertical: 14 },
+  storeTopLine: { height: 1, backgroundColor: '#CFA052', marginBottom: 10 },
+  storeName: { fontFamily: 'Inter_700Bold', fontSize: 14 },
+  storeAddr: { fontFamily: 'Inter_400Regular', fontSize: 14, marginTop: 3 },
+  storeHours: { fontFamily: 'Inter_600SemiBold', fontSize: 11, color: '#CFA052', marginTop: 4 },
+
+  cartFab: { position: 'absolute', bottom: 66, left: 16, right: 16, backgroundColor: '#191816', borderWidth: 1, borderColor: '#CFA052', paddingVertical: 14, alignItems: 'center' },
+  cartFabText: { fontFamily: 'Oswald_600SemiBold', fontSize: 14, color: '#D89F5C', letterSpacing: 1 },
+  tabBar: { flexDirection: 'row', borderTopWidth: 1, height: 56 },
+  tabItem: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  tabText: { fontFamily: 'Oswald_500Medium', fontSize: 11, letterSpacing: 1 },
+  tabDot: { width: 16, height: 2, backgroundColor: '#CFA052', marginTop: 4 },
+
+  modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.68)', justifyContent: 'flex-end' },
+  sheet: { padding: 20 },
+  sheetTop: { flexDirection: 'row', alignItems: 'center' },
+  sheetTitle: { fontFamily: 'Oswald_600SemiBold', fontSize: 20 },
+  sheetDesc: { fontFamily: 'Inter_400Regular', fontSize: 13, marginTop: 6, lineHeight: 18 },
+  barRow: { marginTop: 8 },
+  barLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 10, marginBottom: 3 },
+  barTrack: { height: 5, width: '100%' },
+  barFill: { height: 5, backgroundColor: '#CFA052' },
+  pairingBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, marginTop: 14, borderLeftWidth: 3, borderLeftColor: '#CFA052' },
+  pairingKicker: { fontFamily: 'Oswald_600SemiBold', fontSize: 10, color: '#CFA052', letterSpacing: 1 },
+  pairingText: { fontFamily: 'Inter_600SemiBold', fontSize: 13, marginTop: 2 },
+  pairingBtn: { backgroundColor: '#191816', paddingHorizontal: 10, paddingVertical: 8, borderWidth: 1, borderColor: '#CFA052' },
+  pairingBtnText: { fontFamily: 'Oswald_500Medium', fontSize: 11, color: '#D89F5C' },
+  volRow: { flexDirection: 'row', gap: 8, marginTop: 14 },
+  volBtn: { flex: 1, borderWidth: 1, paddingVertical: 10, alignItems: 'center' },
+  volText: { fontFamily: 'Oswald_500Medium', fontSize: 12 },
+  sheetActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
+  closeBtn: { borderWidth: 1, paddingVertical: 14, paddingHorizontal: 18, justifyContent: 'center' },
+  closeBtnText: { fontFamily: 'Oswald_600SemiBold', fontSize: 13 },
+  addBtn: { flex: 1, backgroundColor: '#CFA052', paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
+  cartRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1 },
+  qtyWrap: { flexDirection: 'row', alignItems: 'center' },
+  qtyBtn: { width: 28, height: 28, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
+  legalNote: { fontFamily: 'Inter_400Regular', fontSize: 11, marginTop: 10 },
+  stepsRow: { flexDirection: 'row', width: '100%', gap: 6, marginTop: 14 },
+  stepBar: { flex: 1, height: 4 },
+  stepBarActive: { backgroundColor: '#CFA052' },
+
+  menuOverlay: { flex: 1, padding: 24, justifyContent: 'space-between' },
+  menuItem: { paddingVertical: 14, borderBottomWidth: 1 },
+  menuItemText: { fontFamily: 'Oswald_600SemiBold', fontSize: 22, letterSpacing: 1 },
+  themeSwitchRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
+  themeSwitchBtn: { flex: 1, borderWidth: 1, paddingVertical: 10, alignItems: 'center' },
+  themeSwitchText: { fontFamily: 'Oswald_500Medium', fontSize: 12, letterSpacing: 1 },
+});
