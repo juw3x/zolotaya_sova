@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Modal, Animated, Easing,
-  StatusBar, NativeSyntheticEvent, NativeScrollEvent,
+  StatusBar, NativeSyntheticEvent, NativeScrollEvent, Pressable, StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -9,6 +9,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { CATALOG, MOODS, Product, PRODUCTS, Store, STORES } from './data';
 import { BrandLogo, ContainerArt, FlavorWheelSvg, OwlLogo } from './components/Art';
 import { BeerBubbles, FadeSlide, ScalePress } from './components/Motion';
+import { ProductModal } from './components/ProductModal';
 import { s, THEMES, ThemeMode } from './styles';
 
 type Tab = 'home' | 'about' | 'catalog' | 'wheel' | 'stores';
@@ -45,7 +46,11 @@ export default function AppRoot() {
   const [selectedStore, setSelectedStore] = useState<Store>(STORES[0]);
 
   const [activeCatId, setActiveCatId] = useState<number>(CATALOG[0].id);
+  const homeScrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const aboutScrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const catalogScrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const wheelScrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const storesScrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const sectionOffsets = useRef<Record<number, number>>({});
 
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
@@ -93,6 +98,21 @@ export default function AppRoot() {
     return () => clearTimeout(timer);
   }, [activeOrder?.code, activeOrder?.status]);
 
+  function navigateTo(target: Tab) {
+    setTab(target);
+    setMenuOpen(false);
+    requestAnimationFrame(() => {
+      if (target === 'home') homeScrollRef.current?.scrollTo({ y: 0, animated: true });
+      if (target === 'about') aboutScrollRef.current?.scrollTo({ y: 0, animated: true });
+      if (target === 'catalog') {
+        setActiveCatId(CATALOG[0].id);
+        catalogScrollRef.current?.scrollTo({ y: 0, animated: true });
+      }
+      if (target === 'wheel') wheelScrollRef.current?.scrollTo({ y: 0, animated: true });
+      if (target === 'stores') storesScrollRef.current?.scrollTo({ y: 0, animated: true });
+    });
+  }
+
   function changeTheme(mode: ThemeMode) {
     setThemeMode(mode);
     AsyncStorage.setItem('sova_theme', mode);
@@ -110,7 +130,7 @@ export default function AppRoot() {
   function selectStore(st: Store) {
     setSelectedStore(st);
     AsyncStorage.setItem('sova_store_id', String(st.id));
-    setTab('catalog');
+    navigateTo('catalog');
   }
 
   function addItem(key: string, name: string, unitPrice: number, subtitle?: string) {
@@ -131,6 +151,15 @@ export default function AppRoot() {
     const sub = p.is_draft ? `Розлив ${vol} л` : p.subtitle;
     addItem(`p_${p.id}_${p.is_draft ? vol : 0}`, p.name, price, sub);
     setDetailProduct(null);
+  }
+
+  function navigateProduct(dir: -1 | 1) {
+    if (!detailProduct) return;
+    const idx = PRODUCTS.findIndex((item) => item.id === detailProduct.id);
+    if (idx < 0) return;
+    const nextIdx = (idx + dir + PRODUCTS.length) % PRODUCTS.length;
+    setDraftVolume(1.0);
+    setDetailProduct(PRODUCTS[nextIdx]);
   }
 
   function updateQty(key: string, delta: number) {
@@ -232,9 +261,9 @@ export default function AppRoot() {
     <SafeAreaView style={[s.root, { backgroundColor: t.bg }]} edges={['top', 'bottom']}>
       <StatusBar barStyle={themeMode === 'dark' ? 'light-content' : 'dark-content'} />
 
-      {/* Шапка с переключателем темы */}
+      {/* Шапка */}
       <View style={[s.header, { backgroundColor: t.bg, borderBottomColor: t.border }]}>
-        <TouchableOpacity onPress={() => setTab('home')}>
+        <TouchableOpacity onPress={() => navigateTo('home')}>
           <BrandLogo compact />
         </TouchableOpacity>
         <View style={s.headerRight}>
@@ -245,7 +274,7 @@ export default function AppRoot() {
           >
             <Text style={[s.themeIconText, { color: t.accent }]}>{themeMode === 'dark' ? '☀' : '☾'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.navChip} onPress={() => setTab('catalog')}>
+          <TouchableOpacity style={s.navChip} onPress={() => navigateTo('catalog')}>
             <Text style={[s.navChipText, { color: t.text }]}>ПРОДУКЦИЯ</Text>
             <View style={s.dotsGrid}>
               <View style={[s.dotSq, { backgroundColor: t.text }]} />
@@ -267,23 +296,23 @@ export default function AppRoot() {
       {tab === 'home' && (
         <View style={{ flex: 1 }}>
           <BeerBubbles />
-          <ScrollView contentContainerStyle={s.homeWrap}>
+          <ScrollView ref={homeScrollRef} contentContainerStyle={s.homeWrap}>
             <FadeSlide delay={0}>
-              <TouchableOpacity style={[s.storeBanner, { borderBottomColor: t.border }]} onPress={() => setTab('stores')}>
+              <TouchableOpacity style={[s.storeBanner, { borderBottomColor: t.border }]} onPress={() => navigateTo('stores')}>
                 <Text style={[s.storeBannerText, { color: t.textMuted }]} numberOfLines={1}>
                   Кемерово • {selectedStore.address}
                 </Text>
                 <Text style={s.storeBannerAction}>СМЕНИТЬ</Text>
               </TouchableOpacity>
               <Text style={[s.heroTitle, { color: t.text }]}>Золотые стандарты{'\n'}«ЗОЛОТОЙ СОВЫ»</Text>
-              <TouchableOpacity onPress={() => setTab('about')} style={s.underlinedLink}>
+              <TouchableOpacity onPress={() => navigateTo('about')} style={s.underlinedLink}>
                 <Text style={[s.underlinedLinkText, { color: t.textSecondary }]}>УЗНАТЬ БОЛЬШЕ</Text>
                 <View style={s.underlinedBar} />
               </TouchableOpacity>
             </FadeSlide>
 
             <FadeSlide delay={90}>
-              <ScalePress onPress={() => setTab('catalog')}>
+              <ScalePress onPress={() => navigateTo('catalog')}>
                 <View style={s.ochreCard}>
                   <Text style={s.ochreCardKicker}>ЛЕГЕНДАРНЫЕ НАПИТКИ</Text>
                   <Text style={s.ochreCardTitle}>Откройте для себя продукцию Золотой совы.</Text>
@@ -293,7 +322,7 @@ export default function AppRoot() {
             </FadeSlide>
 
             <FadeSlide delay={170}>
-              <ScalePress onPress={() => setTab('wheel')}>
+              <ScalePress onPress={() => navigateTo('wheel')}>
                 <View style={s.ochreCard}>
                   <Text style={s.ochreCardKicker}>ГИД ПО ПИВУ</Text>
                   <Text style={s.ochreCardTitle}>Колесо вкусов — подбор под настроение и блюдо.</Text>
@@ -312,9 +341,9 @@ export default function AppRoot() {
 
       {/* 2. О «ЗОЛОТОЙ СОВЕ» */}
       {tab === 'about' && (
-        <ScrollView contentContainerStyle={s.aboutWrap}>
+        <ScrollView ref={aboutScrollRef} contentContainerStyle={s.aboutWrap}>
           <FadeSlide>
-            <TouchableOpacity style={s.aboutBack} onPress={() => setTab('home')}>
+            <TouchableOpacity style={s.aboutBack} onPress={() => navigateTo('home')}>
               <Text style={s.aboutBackText}>← НА ГЛАВНУЮ</Text>
             </TouchableOpacity>
 
@@ -359,11 +388,11 @@ export default function AppRoot() {
             <View style={s.sheetActions}>
               <TouchableOpacity
                 style={[s.closeBtn, { borderColor: t.text }]}
-                onPress={() => setTab('stores')}
+                onPress={() => navigateTo('stores')}
               >
                 <Text style={[s.closeBtnText, { color: t.text }]}>МАГАЗИНЫ</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.addBtn} onPress={() => setTab('catalog')}>
+              <TouchableOpacity style={s.addBtn} onPress={() => navigateTo('catalog')}>
                 <Text style={s.ochreBtnText}>ОТКРЫТЬ КАТАЛОГ</Text>
               </TouchableOpacity>
             </View>
@@ -432,7 +461,7 @@ export default function AppRoot() {
 
       {/* 4. КОЛЕСО ВКУСОВ */}
       {tab === 'wheel' && (
-        <ScrollView contentContainerStyle={s.wheelWrap}>
+        <ScrollView ref={wheelScrollRef} contentContainerStyle={s.wheelWrap}>
           <FadeSlide style={{ alignItems: 'center', width: '100%' }}>
             <Text style={[s.pageTitle, { color: t.text }]}>КОЛЕСО ВКУСОВ</Text>
             <Text style={[s.pageSub, { color: t.textMuted }]}>Нажми на сову в центре или выбери настроение</Text>
@@ -489,7 +518,7 @@ export default function AppRoot() {
 
       {/* 5. ГДЕ КУПИТЬ */}
       {tab === 'stores' && (
-        <ScrollView contentContainerStyle={s.storesWrap}>
+        <ScrollView ref={storesScrollRef} contentContainerStyle={s.storesWrap}>
           <FadeSlide>
             <View style={s.storesHead}>
               <Text style={[s.pageTitle, { color: t.text }]}>ГДЕ КУПИТЬ</Text>
@@ -527,12 +556,13 @@ export default function AppRoot() {
         </Animated.View>
       )}
 
+      {/* Нижнее меню — нажатие всегда переводит в начало выбранного экрана */}
       <View style={[s.tabBar, { backgroundColor: t.tabBg, borderTopColor: t.border }]}>
         {([['home', 'ГЛАВНАЯ'], ['catalog', 'КАТАЛОГ'], ['wheel', 'КОЛЕСО'], ['stores', 'МАГАЗИНЫ']] as [Tab, string][]).map(
           ([id, label]) => {
             const active = tab === id || (id === 'home' && tab === 'about');
             return (
-              <TouchableOpacity key={id} style={s.tabItem} onPress={() => setTab(id)}>
+              <TouchableOpacity key={id} style={s.tabItem} onPress={() => navigateTo(id)}>
                 <Text style={[s.tabText, { color: active ? t.text : t.textMuted }]}>{label}</Text>
                 {active && <View style={s.tabDot} />}
               </TouchableOpacity>
@@ -541,8 +571,8 @@ export default function AppRoot() {
         )}
       </View>
 
-      {/* Полноэкранное меню с выбором темы */}
-      <Modal visible={menuOpen} animationType="fade">
+      {/* Полноэкранное меню */}
+      <Modal visible={menuOpen} animationType="fade" onRequestClose={() => setMenuOpen(false)}>
         <SafeAreaView style={[s.menuOverlay, { backgroundColor: t.bg }]}>
           <BeerBubbles />
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -562,7 +592,7 @@ export default function AppRoot() {
               <FadeSlide key={id} delay={idx * 45}>
                 <TouchableOpacity
                   style={[s.menuItem, { borderBottomColor: t.border }]}
-                  onPress={() => { setTab(id); setMenuOpen(false); }}
+                  onPress={() => navigateTo(id)}
                 >
                   <Text style={[s.menuItemText, { color: t.text }]}>{label}</Text>
                 </TouchableOpacity>
@@ -602,91 +632,23 @@ export default function AppRoot() {
         </SafeAreaView>
       </Modal>
 
-      {/* Карточка товара */}
-      <Modal visible={!!detailProduct} animationType="slide" transparent>
+      {/* Фирменная анимированная карточка товара */}
+      <ProductModal
+        product={detailProduct}
+        theme={t}
+        themeMode={themeMode}
+        draftVolume={draftVolume}
+        onChangeVolume={setDraftVolume}
+        onClose={() => setDetailProduct(null)}
+        onAddProduct={addProductToCart}
+        onAddPairing={(p) => addItem(`snack_${p.id}`, p.pairing.name, p.pairing.price, 'Закуска')}
+        onNavigateProduct={navigateProduct}
+      />
+
+      {/* Корзина и QR-трекер (закрывается по клику на пустую область) */}
+      <Modal visible={cartOpen} animationType="slide" transparent onRequestClose={() => setCartOpen(false)}>
         <View style={s.modalBg}>
-          {detailProduct && (
-            <View style={[s.sheet, { backgroundColor: t.bg }]}>
-              <View style={s.sheetTop}>
-                <ContainerArt productId={detailProduct.id} type={detailProduct.container_type} visual={detailProduct.visual} height={130} />
-                <View style={{ flex: 1, marginLeft: 16 }}>
-                  <Text style={[s.sheetTitle, { color: t.text }]}>{detailProduct.name.toUpperCase()}</Text>
-                  <Text style={s.cardSub}>{detailProduct.subtitle}</Text>
-                  <Text style={[s.sheetDesc, { color: t.textSecondary }]}>{detailProduct.description}</Text>
-                  {detailProduct.is_alcohol && (
-                    <>
-                      <View style={s.barRow}>
-                        <Text style={[s.barLabel, { color: t.textMuted }]}>
-                          КРЕПОСТЬ {detailProduct.abv}% • ПЛОТНОСТЬ {detailProduct.og}%
-                        </Text>
-                        <View style={[s.barTrack, { backgroundColor: t.surface }]}>
-                          <View style={[s.barFill, { width: `${Math.min(100, detailProduct.og * 6.5)}%` }]} />
-                        </View>
-                      </View>
-                      <View style={s.barRow}>
-                        <Text style={[s.barLabel, { color: t.textMuted }]}>ГОРЕЧЬ IBU {detailProduct.ibu}</Text>
-                        <View style={[s.barTrack, { backgroundColor: t.surface }]}>
-                          <View style={[s.barFill, { width: `${Math.min(100, detailProduct.ibu * 3.8)}%` }]} />
-                        </View>
-                      </View>
-                    </>
-                  )}
-                </View>
-              </View>
-
-              <View style={[s.pairingBox, { backgroundColor: t.surface }]}>
-                <View style={{ flex: 1, paddingRight: 8 }}>
-                  <Text style={s.pairingKicker}>ЕДА-ПЕЙРИНГ</Text>
-                  <Text style={[s.pairingText, { color: t.text }]}>{detailProduct.pairing.name}</Text>
-                </View>
-                <ScalePress
-                  onPress={() => addItem(`snack_${detailProduct.id}`, detailProduct.pairing.name, detailProduct.pairing.price, 'Закуска')}
-                >
-                  <View style={s.pairingBtn}>
-                    <Text style={s.pairingBtnText}>+ {detailProduct.pairing.price} ₽</Text>
-                  </View>
-                </ScalePress>
-              </View>
-
-              {detailProduct.is_draft && (
-                <View style={s.volRow}>
-                  {[0.5, 1.0, 1.5].map((v) => {
-                    const active = draftVolume === v;
-                    return (
-                      <TouchableOpacity
-                        key={v}
-                        style={[
-                          s.volBtn,
-                          { borderColor: active ? t.chipActiveBg : t.border },
-                          active && { backgroundColor: t.chipActiveBg },
-                        ]}
-                        onPress={() => setDraftVolume(v)}
-                      >
-                        <Text style={[s.volText, { color: active ? t.chipActiveText : t.text }]}>{v} л</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              )}
-
-              <View style={s.sheetActions}>
-                <TouchableOpacity style={[s.closeBtn, { borderColor: t.text }]} onPress={() => setDetailProduct(null)}>
-                  <Text style={[s.closeBtnText, { color: t.text }]}>ЗАКРЫТЬ</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={s.addBtn} onPress={() => addProductToCart(detailProduct, draftVolume)}>
-                  <Text style={s.ochreBtnText}>
-                    В КОРЗИНУ • {detailProduct.is_draft ? Math.round(detailProduct.base_price * draftVolume) : detailProduct.base_price} ₽
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-        </View>
-      </Modal>
-
-      {/* Корзина и QR-трекер */}
-      <Modal visible={cartOpen} animationType="slide" transparent>
-        <View style={s.modalBg}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setCartOpen(false)} />
           <View style={[s.sheet, { backgroundColor: t.bg }]}>
             {activeOrder ? (
               <View style={{ alignItems: 'center' }}>
