@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  Easing,
   Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -163,8 +164,9 @@ function SideProductPeek({
           </Text>
           <View
             style={{
-              width: 24,
-              height: 150,
+              width: 28,
+              height: 220,
+              overflow: "visible",
               justifyContent: "center",
               alignItems: "center",
             }}
@@ -172,7 +174,8 @@ function SideProductPeek({
             <Text
               numberOfLines={1}
               style={{
-                width: 150,
+                position: "absolute",
+                width: 220,
                 textAlign: "center",
                 fontFamily: "Oswald_500Medium",
                 fontSize: 11,
@@ -216,6 +219,7 @@ export function ProductModal({
 
   const scrollY = useRef(new Animated.Value(0)).current;
   const pageOpacity = useRef(new Animated.Value(0)).current;
+  const panelSlideX = useRef(new Animated.Value(360)).current;
   const bottleScale = useRef(new Animated.Value(0.88)).current;
   const bottleShift = useRef(new Animated.Value(22)).current;
 
@@ -227,15 +231,22 @@ export function ProductModal({
     scrollRef.current?.scrollTo({ y: 0, animated: false });
 
     pageOpacity.setValue(0);
+    panelSlideX.setValue(Math.min(width, 460));
     bottleScale.setValue(0.88);
     bottleShift.setValue(22);
 
     Animated.parallel([
       Animated.timing(pageOpacity, { toValue: 1, duration: 260, useNativeDriver: true }),
+      Animated.timing(panelSlideX, {
+        toValue: 0,
+        duration: 340,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
       Animated.spring(bottleScale, { toValue: 1, friction: 6, tension: 75, useNativeDriver: true }),
       Animated.spring(bottleShift, { toValue: 0, friction: 7, tension: 70, useNativeDriver: true }),
     ]).start();
-  }, [product?.id, bottleScale, bottleShift, pageOpacity, scrollY]);
+  }, [product?.id, bottleScale, bottleShift, pageOpacity, panelSlideX, scrollY, width]);
 
   if (!product) return null;
 
@@ -304,8 +315,9 @@ export function ProductModal({
   }
 
   return (
-    <Modal visible={!!product} animationType="fade" onRequestClose={onClose}>
-      <Animated.View style={[st.root, { backgroundColor: bgInterp }]}>
+    <Modal visible={!!product} transparent animationType="none" onRequestClose={onClose}>
+      <Animated.View style={{ flex: 1, backgroundColor: "rgba(10, 9, 8, 0.75)", opacity: pageOpacity }}>
+      <Animated.View style={[st.root, { backgroundColor: bgInterp, transform: [{ translateX: panelSlideX }] }]}>
         <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
           <Animated.View style={{ flex: 1, opacity: pageOpacity }}>
             {/* Верхняя шапка */}
@@ -763,6 +775,7 @@ export function ProductModal({
             </Animated.View>
           </Animated.View>
         </SafeAreaView>
+      </Animated.View>
       </Animated.View>
     </Modal>
   );

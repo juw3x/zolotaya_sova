@@ -5,11 +5,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import QRCode from 'react-native-qrcode-svg';
 import { CATALOG, MOODS, Product, PRODUCTS, Store, STORES } from './data';
 import { BrandLogo, ContainerArt, FlavorWheelSvg, OwlLogo } from './components/Art';
 import { BeerBubbles, FadeSlide, ScalePress } from './components/Motion';
 import { ProductModal } from './components/ProductModal';
+import { CartModal } from './components/CartModal';
 import { s, THEMES, ThemeMode } from './styles';
 
 type Tab = 'home' | 'about' | 'catalog' | 'wheel' | 'stores';
@@ -660,123 +660,22 @@ export default function AppRoot() {
         );
       })()}
 
-      {/* Корзина и QR-трекер (закрывается по клику на пустую область) */}
-      <Modal visible={cartOpen} animationType="slide" transparent onRequestClose={() => setCartOpen(false)}>
-        <View style={s.modalBg}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setCartOpen(false)} />
-          <View style={[s.sheet, { backgroundColor: t.bg }]}>
-            {activeOrder ? (
-              <View style={{ alignItems: 'center' }}>
-                <Text style={[s.sheetTitle, { color: t.text }]}>БРОНЬ {activeOrder.code}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                  <Animated.View
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: 4,
-                      backgroundColor: activeOrder.status === 'ready' ? '#194D33' : '#CFA052',
-                      marginRight: 6,
-                      opacity: pulseAnim,
-                    }}
-                  />
-                  <Text style={[s.cardSub, { marginTop: 0 }]}>{STATUS_LABELS[activeOrder.status].toUpperCase()}</Text>
-                </View>
-                <View style={s.stepsRow}>
-                  {STATUS_FLOW.map((st, idx) => (
-                    <View
-                      key={st}
-                      style={[
-                        s.stepBar,
-                        { backgroundColor: t.surface },
-                        idx <= STATUS_FLOW.indexOf(activeOrder.status) && s.stepBarActive,
-                      ]}
-                    />
-                  ))}
-                </View>
-                <View style={{ marginVertical: 18, padding: 12, backgroundColor: '#FFFFFF' }}>
-                  <QRCode value={activeOrder.code} size={150} />
-                </View>
-                <Text style={[s.sheetDesc, { textAlign: 'center', color: t.textSecondary }]}>
-                  {activeOrder.storeAddress} • {activeOrder.pickupTime}{'\n'}К оплате на кассе (18+): {activeOrder.totalPrice} ₽
-                </Text>
-                <View style={s.sheetActions}>
-                  <TouchableOpacity style={[s.closeBtn, { borderColor: t.text }]} onPress={() => setCartOpen(false)}>
-                    <Text style={[s.closeBtnText, { color: t.text }]}>СКРЫТЬ</Text>
-                  </TouchableOpacity>
-                  {activeOrder.status === 'ready' ? (
-                    <TouchableOpacity
-                      style={s.addBtn}
-                      onPress={() => { setActiveOrder(null); setCartOpen(false); }}
-                    >
-                      <Text style={s.ochreBtnText}>ЗАБРАЛ ЗАКАЗ</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <TouchableOpacity
-                      style={[s.closeBtn, { flex: 1, alignItems: 'center', borderColor: '#B32624' }]}
-                      onPress={() => { setActiveOrder(null); setCartOpen(false); }}
-                    >
-                      <Text style={[s.closeBtnText, { color: '#B32624' }]}>ОТМЕНИТЬ БРОНЬ</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-            ) : (
-              <View>
-                <Text style={[s.sheetTitle, { color: t.text }]}>САМОВЫВОЗ У ДОМА</Text>
-                <Text style={s.cardSub}>{selectedStore.address}</Text>
-                <ScrollView style={{ maxHeight: 220, marginVertical: 12 }}>
-                  {cart.map((c) => (
-                    <View key={c.key} style={[s.cartRow, { borderBottomColor: t.border }]}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[s.cardTitle, { color: t.text }]}>{c.name}</Text>
-                        <Text style={s.cardSub}>{c.subtitle ? `${c.subtitle} • ` : ''}{c.unitPrice} ₽</Text>
-                      </View>
-                      <View style={s.qtyWrap}>
-                        <TouchableOpacity style={[s.qtyBtn, { borderColor: t.border }]} onPress={() => updateQty(c.key, -1)}>
-                          <Text style={{ color: t.text }}>−</Text>
-                        </TouchableOpacity>
-                        <Text style={{ marginHorizontal: 10, fontWeight: '700', color: t.text }}>{c.quantity}</Text>
-                        <TouchableOpacity style={[s.qtyBtn, { borderColor: t.border }]} onPress={() => updateQty(c.key, 1)}>
-                          <Text style={{ color: t.text }}>+</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  ))}
-                </ScrollView>
-                <View style={s.volRow}>
-                  {['Через 15 минут', 'Через 30 минут', 'Через 1 час'].map((timeOpt) => {
-                    const active = pickupTime === timeOpt;
-                    return (
-                      <TouchableOpacity
-                        key={timeOpt}
-                        style={[
-                          s.volBtn,
-                          { borderColor: active ? t.chipActiveBg : t.border },
-                          active && { backgroundColor: t.chipActiveBg },
-                        ]}
-                        onPress={() => setPickupTime(timeOpt)}
-                      >
-                        <Text style={[s.volText, { color: active ? t.chipActiveText : t.text }]}>{timeOpt}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-                <Text style={[s.legalNote, { color: t.textMuted }]}>
-                  Оплата и выдача алкогольной продукции строго на кассе по паспорту (18+).
-                </Text>
-                <View style={s.sheetActions}>
-                  <TouchableOpacity style={[s.closeBtn, { borderColor: t.text }]} onPress={() => setCartOpen(false)}>
-                    <Text style={[s.closeBtnText, { color: t.text }]}>ЗАКРЫТЬ</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={s.addBtn} onPress={submitOrder}>
-                    <Text style={s.ochreBtnText}>ЗАБРОНИРОВАТЬ • {totalSum} ₽</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-          </View>
-        </View>
-      </Modal>
+      {/* Фирменная выезжающая корзина и талон самовывоза */}
+      <CartModal
+        visible={cartOpen}
+        cart={cart}
+        activeOrder={activeOrder}
+        selectedStore={selectedStore}
+        pickupTime={pickupTime}
+        totalSum={totalSum}
+        themeMode={themeMode}
+        pulseAnim={pulseAnim}
+        onClose={() => setCartOpen(false)}
+        onUpdateQty={updateQty}
+        onChangePickupTime={setPickupTime}
+        onSubmitOrder={submitOrder}
+        onClearOrder={() => { setActiveOrder(null); setCartOpen(false); }}
+      />
     </SafeAreaView>
   );
 }
