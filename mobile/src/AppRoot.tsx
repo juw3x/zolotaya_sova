@@ -416,7 +416,7 @@ export default function AppRoot() {
                       onPress={() => { setDraftVolume(1.0); setDetailProduct(p); }}
                     >
                       <View style={[s.pedestal, { backgroundColor: t.surface }]}>
-                        <ContainerArt type={p.container_type} visual={p.visual} height={110} />
+                        <ContainerArt productId={p.id} type={p.container_type} visual={p.visual} height={110} />
                       </View>
                       <Text style={[s.cardTitle, { color: t.text }]} numberOfLines={2}>{p.name.toUpperCase()}</Text>
                       {!!p.subtitle && <Text style={s.cardSub} numberOfLines={1}>{p.subtitle.toUpperCase()}</Text>}
@@ -472,7 +472,7 @@ export default function AppRoot() {
                 {wheelProducts.map((p) => (
                   <ScalePress key={p.id} onPress={() => { setDraftVolume(1.0); setDetailProduct(p); }}>
                     <View style={[s.recRow, { backgroundColor: t.surface }]}>
-                      <ContainerArt type={p.container_type} visual={p.visual} height={58} />
+                      <ContainerArt productId={p.id} type={p.container_type} visual={p.visual} height={58} />
                       <View style={{ flex: 1, marginLeft: 12 }}>
                         <Text style={[s.cardTitle, { color: t.text }]}>{p.name}</Text>
                         <Text style={s.cardSub}>К закуске: {p.pairing.name}</Text>
@@ -608,7 +608,7 @@ export default function AppRoot() {
           {detailProduct && (
             <View style={[s.sheet, { backgroundColor: t.bg }]}>
               <View style={s.sheetTop}>
-                <ContainerArt type={detailProduct.container_type} visual={detailProduct.visual} height={130} />
+                <ContainerArt productId={detailProduct.id} type={detailProduct.container_type} visual={detailProduct.visual} height={130} />
                 <View style={{ flex: 1, marginLeft: 16 }}>
                   <Text style={[s.sheetTitle, { color: t.text }]}>{detailProduct.name.toUpperCase()}</Text>
                   <Text style={s.cardSub}>{detailProduct.subtitle}</Text>
