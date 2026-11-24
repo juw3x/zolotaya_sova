@@ -633,17 +633,32 @@ export default function AppRoot() {
       </Modal>
 
       {/* Фирменная анимированная карточка товара */}
-      <ProductModal
-        product={detailProduct}
-        theme={t}
-        themeMode={themeMode}
-        draftVolume={draftVolume}
-        onChangeVolume={setDraftVolume}
-        onClose={() => setDetailProduct(null)}
-        onAddProduct={addProductToCart}
-        onAddPairing={(p) => addItem(`snack_${p.id}`, p.pairing.name, p.pairing.price, 'Закуска')}
-        onNavigateProduct={navigateProduct}
-      />
+      {(() => {
+        const curIdx = detailProduct ? PRODUCTS.findIndex((x) => x.id === detailProduct.id) : -1;
+        const prevProduct = curIdx >= 0 ? PRODUCTS[(curIdx - 1 + PRODUCTS.length) % PRODUCTS.length] : null;
+        const nextProduct = curIdx >= 0 ? PRODUCTS[(curIdx + 1) % PRODUCTS.length] : null;
+        return (
+          <ProductModal
+            product={detailProduct}
+            prevProduct={prevProduct}
+            nextProduct={nextProduct}
+            stores={STORES}
+            selectedStore={selectedStore}
+            theme={t}
+            themeMode={themeMode}
+            draftVolume={draftVolume}
+            onChangeVolume={setDraftVolume}
+            onClose={() => setDetailProduct(null)}
+            onAddProduct={addProductToCart}
+            onAddPairing={(p) => addItem(`snack_${p.id}`, p.pairing.name, p.pairing.price, "Закуска")}
+            onSelectProduct={(p) => { setDraftVolume(1.0); setDetailProduct(p); }}
+            onSelectStore={(st) => {
+              setSelectedStore(st);
+              AsyncStorage.setItem("sova_store_id", String(st.id));
+            }}
+          />
+        );
+      })()}
 
       {/* Корзина и QR-трекер (закрывается по клику на пустую область) */}
       <Modal visible={cartOpen} animationType="slide" transparent onRequestClose={() => setCartOpen(false)}>

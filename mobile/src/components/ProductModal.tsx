@@ -1,22 +1,50 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
-  Easing,
   Modal,
-  Pressable,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import { Product } from '../data';
-import { ContainerArt, OwlLogo } from './Art';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Product, Store } from '../data';
+import { getProductDetail } from '../productDetails';
+import { BrandLogo, ContainerArt, OwlLogo } from './Art';
 import { ScalePress } from './Motion';
 import { ThemeMode, ThemePalette } from '../styles';
 
+type SectionId =
+  | 'desc'
+  | 'history'
+  | 'taste'
+  | 'components'
+  | 'formats'
+  | 'legend'
+  | 'technology'
+  | 'buy';
+
+const SECTIONS: { id: SectionId; label: string }[] = [
+  { id: 'desc', label: 'ОПИСАНИЕ' },
+  { id: 'history', label: 'ИСТОРИЯ' },
+  { id: 'taste', label: 'ВКУС' },
+  { id: 'components', label: 'КОМПОНЕНТЫ' },
+  { id: 'formats', label: 'ФОРМАТЫ' },
+  { id: 'legend', label: 'ЛЕГЕНДА' },
+  { id: 'technology', label: 'ТЕХНОЛОГИЯ' },
+  { id: 'buy', label: 'ГДЕ КУПИТЬ' },
+];
+
 interface Props {
   product: Product | null;
+  prevProduct: Product | null;
+  nextProduct: Product | null;
+  stores: Store[];
+  selectedStore: Store;
   theme: ThemePalette;
   themeMode: ThemeMode;
   draftVolume: number;
@@ -24,275 +52,570 @@ interface Props {
   onClose: () => void;
   onAddProduct: (p: Product, vol: number) => void;
   onAddPairing: (p: Product) => void;
-  onNavigateProduct: (dir: -1 | 1) => void;
-}
-
-function getProductMeta(p: Product) {
-  const numMatch = p.name.match(/№\d+/);
-  const badge = numMatch ? numMatch[0] : p.is_draft ? 'РАЗЛИВ' : 'GOLD';
-
-  if (p.is_alcohol) {
-    const isDark = p.mood_tags.includes('dark');
-    const isAmber = p.id === 5 || p.id === 18 || p.id === 16;
-    const isRichGold = p.ibu >= 16 || p.og >= 12;
-
-    const colorName = isDark
-      ? 'Тёмно-рубиновый'
-      : isAmber
-      ? 'Янтарный'
-      : isRichGold
-      ? 'Золотистый'
-      : 'Светло-золотистый';
-    const colorLevel = isDark ? 5 : isAmber ? 4 : isRichGold ? 3 : 2;
-
-    const composition = isDark
-      ? 'ВОДА ОЧИЩЕННАЯ, СОЛОД ПИВОВАРЕННЫЙ ЯЧМЕННЫЙ СВЕТЛЫЙ, СОЛОД КАРАМЕЛЬНЫЙ И ЖЖЁНЫЙ, ХМЕЛЬ ГРАНУЛИРОВАННЫЙ.'
-      : 'ВОДА ОЧИЩЕННАЯ, СОЛОД ПИВОВАРЕННЫЙ ЯЧМЕННЫЙ СВЕТЛЫЙ, ХМЕЛЬ ГРАНУЛИРОВАННЫЙ. СОВЕСТЬ ПИВОВАРА.';
-
-    return {
-      kicker: p.id === 8 || p.id === 11 || p.id === 26 ? 'ГОРОДСКАЯ ЛЕГЕНДА' : 'ПРОВЕРЕННОЕ КАЧЕСТВО',
-      badge,
-      gost: 'ГОСТ 31711-2012',
-      colorName,
-      colorLevel,
-      composition,
-    };
-  }
-
-  if (p.category_id === 8 || p.category_id === 9) {
-    return {
-      kicker: 'ЖИВОЕ БРОЖЕНИЕ',
-      badge: 'КВАС',
-      gost: 'ГОСТ 31494-2012',
-      colorName: 'Тёмно-хлебный',
-      colorLevel: 5,
-      composition: 'ВОДА ПОДГОТОВЛЕННАЯ, КОНЦЕНТРАТ КВАСНОГО СУСЛА (РЖАНОЙ И ЯЧМЕННЫЙ СОЛОД), САХАР, ДРОЖЖИ.',
-    };
-  }
-
-  if (p.category_id === 10) {
-    return {
-      kicker: 'ПРИРОДНАЯ ЧИСТОТА',
-      badge: '1,5 Л',
-      gost: 'ГОСТ Р 54316-2020',
-      colorName: 'Кристально прозрачный',
-      colorLevel: 1,
-      composition: 'ВОДА ПИТЬЕВАЯ АРТЕЗИАНСКАЯ ПОДГОТОВЛЕННАЯ, ДИОКСИД УГЛЕРОДА.',
-    };
-  }
-
-  return {
-    kicker: 'ВКУС ДЕТСТВА',
-    badge: p.is_draft ? 'КЕГ' : 'ЛИМОНАД',
-    gost: 'ГОСТ 28188-2014',
-    colorName: 'Солнечный карамельный',
-    colorLevel: 3,
-    composition: 'ВОДА АРТЕЗИАНСКАЯ ПОДГОТОВЛЕННАЯ, САХАР, НАТУРАЛЬНЫЕ АРОМАТИЧЕСКИЕ ОСНОВЫ, ЛИМОННАЯ КИСЛОТА.',
-  };
+  onSelectProduct: (p: Product) => void;
+  onSelectStore: (st: Store) => void;
 }
 
 export function ProductModal({
   product,
-  theme: t,
+  prevProduct,
+  nextProduct,
+  stores,
+  selectedStore,
   themeMode,
   draftVolume,
   onChangeVolume,
   onClose,
   onAddProduct,
   onAddPairing,
-  onNavigateProduct,
+  onSelectProduct,
+  onSelectStore,
 }: Props) {
-  const cardOpacity = useRef(new Animated.Value(0)).current;
-  const cardSlide = useRef(new Animated.Value(28)).current;
-  const bottleScale = useRef(new Animated.Value(0.84)).current;
-  const bottleOpacity = useRef(new Animated.Value(0)).current;
+  const { width } = useWindowDimensions();
+  const isWide = width >= 820;
+
+  const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const offsets = useRef<Partial<Record<SectionId, number>>>({});
+  const [activeSec, setActiveSec] = useState<SectionId>('desc');
+  const [scrolledPastHero, setScrolledPastHero] = useState(false);
+
+  const pageOpacity = useRef(new Animated.Value(0)).current;
+  const bottleScale = useRef(new Animated.Value(0.86)).current;
+  const bottleShift = useRef(new Animated.Value(24)).current;
 
   useEffect(() => {
     if (!product) return;
-    cardOpacity.setValue(0);
-    cardSlide.setValue(24);
-    bottleScale.setValue(0.84);
-    bottleOpacity.setValue(0);
+    setActiveSec('desc');
+    setScrolledPastHero(false);
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+
+    pageOpacity.setValue(0);
+    bottleScale.setValue(0.86);
+    bottleShift.setValue(24);
 
     Animated.parallel([
-      Animated.timing(cardOpacity, {
-        toValue: 1,
-        duration: 240,
-        useNativeDriver: true,
-      }),
-      Animated.spring(cardSlide, {
-        toValue: 0,
-        friction: 8,
-        tension: 75,
-        useNativeDriver: true,
-      }),
-      Animated.timing(bottleOpacity, {
-        toValue: 1,
-        duration: 320,
-        delay: 70,
-        useNativeDriver: true,
-      }),
-      Animated.spring(bottleScale, {
-        toValue: 1,
-        friction: 6,
-        tension: 90,
-        delay: 70,
-        useNativeDriver: true,
-      }),
+      Animated.timing(pageOpacity, { toValue: 1, duration: 260, useNativeDriver: true }),
+      Animated.spring(bottleScale, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true }),
+      Animated.spring(bottleShift, { toValue: 0, friction: 7, tension: 75, useNativeDriver: true }),
     ]).start();
-  }, [product?.id, bottleOpacity, bottleScale, cardOpacity, cardSlide]);
+  }, [product?.id, bottleScale, bottleShift, pageOpacity]);
 
   if (!product) return null;
 
-  const meta = getProductMeta(product);
-  const isDark = themeMode === 'dark';
-  const cardBg = isDark ? '#231912' : '#FAF6EE';
-  const subSurface = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(25,24,22,0.04)';
-  const lineCol = isDark ? 'rgba(207, 160, 82, 0.24)' : 'rgba(25, 24, 22, 0.12)';
+  const d = getProductDetail(product);
   const finalPrice = product.is_draft ? Math.round(product.base_price * draftVolume) : product.base_price;
 
-  return (
-    <Modal visible={!!product} transparent animationType="none" onRequestClose={onClose}>
-      <View style={st.overlay}>
-        {/* Клик по любой пустой области вокруг карточки закрывает окно */}
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+  // На первом экране («Описание») — фирменный шоколадный фон, ниже — светлый кремовый (или тёмный в dark-режиме)
+  const isHeroDark = !scrolledPastHero;
+  const pageBg = isHeroDark ? '#342014' : themeMode === 'dark' ? '#1C1917' : '#F3EEE8';
+  const mainText = isHeroDark ? '#FFFFFF' : themeMode === 'dark' ? '#FFFFFF' : '#1E1C1A';
+  const subText = isHeroDark ? '#D9CFC4' : themeMode === 'dark' ? '#CFC8BE' : '#534E48';
+  const mutedText = isHeroDark ? '#AE9A88' : themeMode === 'dark' ? '#9C9489' : '#8A8176';
+  const lineCol = isHeroDark
+    ? 'rgba(207, 160, 82, 0.35)'
+    : themeMode === 'dark'
+    ? 'rgba(255,255,255,0.12)'
+    : 'rgba(25,24,22,0.14)';
+  const cardSurface = themeMode === 'dark' && !isHeroDark ? '#26221F' : '#FFFFFF';
 
-        <Animated.View
-          style={[
-            st.card,
-            {
-              backgroundColor: cardBg,
-              borderColor: isDark ? 'rgba(207,160,82,0.35)' : '#E5DEC9',
-              opacity: cardOpacity,
-              transform: [{ translateY: cardSlide }],
-            },
-          ]}
-        >
-          {/* Верхняя панель с переключением сортов */}
-          <View style={[st.topBar, { borderBottomColor: lineCol }]}>
-            <TouchableOpacity style={st.navPill} onPress={() => onNavigateProduct(-1)}>
-              <Text style={st.navPillText}>‹ ПРЕД.</Text>
+  const brandStores = stores.filter((s) => s.name.includes('GOLD SOVA'));
+  const deptStores = stores.filter((s) => !s.name.includes('GOLD SOVA'));
+
+  function scrollToSection(id: SectionId) {
+    setActiveSec(id);
+    const y = offsets.current[id] ?? 0;
+    scrollRef.current?.scrollTo({ y, animated: true });
+  }
+
+  function handleScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
+    const y = e.nativeEvent.contentOffset.y;
+    const historyY = offsets.current.history ?? 360;
+    setScrolledPastHero(y > historyY * 0.55);
+
+    let current: SectionId = 'desc';
+    for (const sec of SECTIONS) {
+      const top = offsets.current[sec.id];
+      if (top !== undefined && y + 140 >= top) current = sec.id;
+    }
+    if (current !== activeSec) setActiveSec(current);
+  }
+
+  return (
+    <Modal visible={!!product} animationType="fade" onRequestClose={onClose}>
+      <SafeAreaView style={[st.root, { backgroundColor: pageBg }]} edges={['top', 'bottom']}>
+        <Animated.View style={{ flex: 1, opacity: pageOpacity }}>
+          {/* Верхняя шапка как на сайте */}
+          <View style={[st.topHeader, { borderBottomColor: lineCol }]}>
+            <TouchableOpacity onPress={onClose}>
+              <BrandLogo compact />
             </TouchableOpacity>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <OwlLogo size={18} />
-              <Text style={[st.brandLabel, { color: t.textMuted }]}>ЗОЛОТАЯ СОВА • 1972</Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <TouchableOpacity style={st.navPill} onPress={() => onNavigateProduct(1)}>
-                <Text style={st.navPillText}>СЛЕД. ›</Text>
+            <View style={st.topHeaderRight}>
+              <TouchableOpacity style={st.topLink} onPress={onClose}>
+                <Text style={[st.topLinkText, { color: mainText }]}>ВСЯ ПРОДУКЦИЯ</Text>
+                <View style={st.dotsGrid}>
+                  <View style={[st.dotSq, { backgroundColor: mainText }]} />
+                  <View style={[st.dotSq, { backgroundColor: mainText }]} />
+                  <View style={[st.dotSq, { backgroundColor: mainText }]} />
+                  <View style={[st.dotSq, { backgroundColor: mainText }]} />
+                </View>
               </TouchableOpacity>
-              <TouchableOpacity onPress={onClose} hitSlop={10}>
-                <Text style={[st.closeX, { color: t.textMuted }]}>✕</Text>
+              <TouchableOpacity
+                style={[st.closeCircle, { borderColor: lineCol }]}
+                onPress={onClose}
+                accessibilityLabel="Закрыть карточку"
+              >
+                <Text style={[st.closeCircleText, { color: mainText }]}>✕</Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 6 }}>
-            {/* Витринный блок: крупный номер + фото бутылки на золотистом свечении */}
-            <View style={st.heroRow}>
-              <View style={st.heroLeft}>
-                <Text style={st.kicker}>{meta.kicker}</Text>
-                <Text style={[st.bigBadge, { color: t.text }]}>{meta.badge}</Text>
-                <Text style={[st.title, { color: t.text }]}>{product.name}</Text>
-                {!!product.subtitle && <Text style={st.subtitle}>{product.subtitle}</Text>}
-              </View>
+          {/* Мобильное горизонтальное меню разделов (на узких экранах) */}
+          {!isWide && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ maxHeight: 42, borderBottomWidth: 1, borderBottomColor: lineCol }}
+              contentContainerStyle={{ paddingHorizontal: 14, alignItems: 'center', gap: 14 }}
+            >
+              {SECTIONS.map((sec) => {
+                const active = activeSec === sec.id;
+                return (
+                  <TouchableOpacity key={sec.id} onPress={() => scrollToSection(sec.id)} style={{ paddingVertical: 8 }}>
+                    <Text
+                      style={[
+                        st.sideMenuText,
+                        { color: active ? '#CFA052' : mutedText, fontSize: 11 },
+                      ]}
+                    >
+                      {active ? '— ' : ''}
+                      {sec.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          )}
 
-              <Animated.View
-                style={[
-                  st.bottleStage,
-                  { opacity: bottleOpacity, transform: [{ scale: bottleScale }] },
-                ]}
+          {/* Основная рабочая область */}
+          <View style={{ flex: 1, flexDirection: isWide ? 'row' : 'column' }}>
+            {/* Левая фиксированная колонка (только на широких экранах — точь-в-точь как на сайте) */}
+            {isWide && (
+              <View style={st.leftCol}>
+                {prevProduct && (
+                  <TouchableOpacity
+                    style={st.edgeNavLeft}
+                    onPress={() => onSelectProduct(prevProduct)}
+                  >
+                    <Text style={[st.edgeNavText, { color: mutedText }]} numberOfLines={1}>
+                      ‹ {prevProduct.name.toUpperCase()}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                <View style={{ paddingLeft: 44, paddingTop: 24 }}>
+                  <Text style={st.kicker}>{d.kicker}</Text>
+                  <Text style={[st.bigNumber, { color: isHeroDark ? '#FFFFFF' : '#CFA052' }]}>
+                    {d.badge}
+                    <Text style={{ fontSize: 22 }}>°</Text>
+                  </Text>
+
+                  <View style={{ marginTop: 34, gap: 10 }}>
+                    {SECTIONS.map((sec) => {
+                      const active = activeSec === sec.id;
+                      return (
+                        <TouchableOpacity
+                          key={sec.id}
+                          style={st.sideMenuItem}
+                          onPress={() => scrollToSection(sec.id)}
+                        >
+                          <View
+                            style={[
+                              st.sideDash,
+                              { opacity: active ? 1 : 0 },
+                            ]}
+                          />
+                          <Text
+                            style={[
+                              st.sideMenuText,
+                              { color: active ? mainText : mutedText },
+                            ]}
+                          >
+                            {sec.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* Центральная фиксированная бутылка (на широких экранах) */}
+            {isWide && (
+              <View style={st.centerBottleCol}>
+                <Animated.View
+                  style={{
+                    alignItems: 'center',
+                    transform: [{ scale: bottleScale }, { translateY: bottleShift }],
+                  }}
+                >
+                  <ContainerArt
+                    productId={product.id}
+                    type={product.container_type}
+                    visual={product.visual}
+                    height={390}
+                  />
+                </Animated.View>
+              </View>
+            )}
+
+            {/* Правая прокручиваемая колонка со всеми 8 разделами */}
+            <ScrollView
+              ref={scrollRef}
+              style={{ flex: 1 }}
+              contentContainerStyle={[
+                st.scrollContent,
+                { paddingHorizontal: isWide ? 36 : 18 },
+              ]}
+              scrollEventThrottle={16}
+              onScroll={handleScroll}
+            >
+              {/* 1. ОПИСАНИЕ */}
+              <View
+                onLayout={(e) => { offsets.current.desc = e.nativeEvent.layout.y; }}
+                style={[st.sectionBlock, { minHeight: isWide ? 520 : undefined, justifyContent: 'center' }]}
               >
-                <View style={st.haloOuter} />
-                <View style={st.haloInner} />
-                <ContainerArt
-                  productId={product.id}
-                  type={product.container_type}
-                  visual={product.visual}
-                  height={165}
-                />
-              </Animated.View>
-            </View>
+                {!isWide && (
+                  <View style={st.mobileHeroTop}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={st.kicker}>{d.kicker}</Text>
+                      <Text style={[st.bigNumber, { fontSize: 42, color: isHeroDark ? '#FFFFFF' : '#CFA052' }]}>
+                        {d.badge}°
+                      </Text>
+                    </View>
+                    <Animated.View style={{ transform: [{ scale: bottleScale }] }}>
+                      <ContainerArt
+                        productId={product.id}
+                        type={product.container_type}
+                        visual={product.visual}
+                        height={175}
+                      />
+                    </Animated.View>
+                  </View>
+                )}
 
-            <Text style={[st.desc, { color: t.textSecondary }]}>{product.description}</Text>
+                <Text style={[st.heroTitle, { color: mainText }]}>{product.name}</Text>
 
-            {/* Таблица характеристик (без непонятных длинных полосок) */}
-            <View style={[st.specsBox, { borderTopColor: lineCol, borderBottomColor: lineCol }]}>
-              <View style={[st.specRow, { borderBottomColor: lineCol }]}>
-                <Text style={[st.specLabel, { color: t.text }]}>Проверенное заводское качество</Text>
-                <Text style={[st.specVal, { color: t.textMuted }]}>{meta.gost}</Text>
+                <View style={[st.specTable, { borderTopColor: lineCol }]}>
+                  <View style={[st.specRow, { borderBottomColor: lineCol }]}>
+                    <Text style={[st.specKey, { color: mainText }]}>Проверенное заводское качество</Text>
+                    <Text style={[st.specVal, { color: mutedText }]}>{d.gost}</Text>
+                  </View>
+
+                  <View style={[st.specRow, { borderBottomColor: lineCol }]}>
+                    <View style={st.halfCell}>
+                      <Text style={[st.specKey, { color: mainText }]}>Алкоголь</Text>
+                      <Text style={[st.specVal, { color: '#CFA052', fontWeight: '700' }]}>
+                        {product.is_alcohol ? `${product.abv.toFixed(1).replace('.', ',')}%` : '0,0%'}
+                      </Text>
+                    </View>
+                    <View style={[st.halfCell, { borderLeftWidth: 1, borderLeftColor: lineCol, paddingLeft: 12 }]}>
+                      <Text style={[st.specKey, { color: mainText }]}>Экстрактивность нач. сусла</Text>
+                      <Text style={[st.specVal, { color: mainText }]}>
+                        {product.is_alcohol ? `${product.og}%` : '—'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={[st.specRow, { borderBottomColor: lineCol }]}>
+                    <Text style={[st.specKey, { color: mainText }]}>Цвет напитка</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <Text style={[st.specVal, { color: subText }]}>{d.colorName}</Text>
+                      <View style={{ flexDirection: 'row', gap: 4 }}>
+                        {[1, 2, 3, 4, 5].map((lvl) => (
+                          <View
+                            key={lvl}
+                            style={[
+                              st.colorSeg,
+                              {
+                                backgroundColor:
+                                  lvl <= d.colorLevel ? '#CFA052' : 'rgba(160,150,140,0.35)',
+                              },
+                            ]}
+                          />
+                        ))}
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={[st.compBox, { borderBottomColor: lineCol }]}>
+                    <Text style={{ fontSize: 18 }}>🌾</Text>
+                    <Text style={[st.compText, { color: mainText }]}>
+                      <Text style={{ color: '#CFA052', fontFamily: 'Oswald_600SemiBold' }}>СОСТАВ: </Text>
+                      {d.composition}
+                    </Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity style={st.downCue} onPress={() => scrollToSection('history')}>
+                  <Text style={st.downCueText}>ПОЗНАКОМИТЬСЯ С СОРТОМ</Text>
+                  <View style={st.downCueLine} />
+                  <View style={st.downCueCircle} />
+                </TouchableOpacity>
               </View>
 
-              {product.is_alcohol ? (
-                <View style={[st.specRow, { borderBottomColor: lineCol }]}>
-                  <Text style={[st.specLabel, { color: t.textMuted }]}>
-                    Алкоголь   <Text style={[st.specStrong, { color: t.text }]}>{product.abv.toFixed(1)}%</Text>
-                  </Text>
-                  <Text style={[st.specLabel, { color: t.textMuted }]}>
-                    Начальное сусло   <Text style={[st.specStrong, { color: t.text }]}>{product.og}%</Text>
-                  </Text>
-                </View>
-              ) : (
-                <View style={[st.specRow, { borderBottomColor: lineCol }]}>
-                  <Text style={[st.specLabel, { color: t.textMuted }]}>
-                    Крепость   <Text style={[st.specStrong, { color: t.text }]}>0,0%</Text>
-                  </Text>
-                  <Text style={[st.specLabel, { color: t.textMuted }]}>
-                    Формат   <Text style={[st.specStrong, { color: t.text }]}>{product.subtitle || 'Свежий розлив'}</Text>
-                  </Text>
-                </View>
-              )}
+              {/* 2. ИСТОРИЯ */}
+              <View
+                onLayout={(e) => { offsets.current.history = e.nativeEvent.layout.y; }}
+                style={[st.sectionBlock, { borderTopWidth: 1, borderTopColor: lineCol }]}
+              >
+                <Text style={[st.sectionTitle, { color: mainText }]}>{d.historyHeadline}</Text>
+                <View style={st.twoColWrap}>
+                  <View style={{ flex: 2 }}>
+                    <Text style={st.goldSubTitle}>История сорта</Text>
+                    <Text style={[st.bodyText, { color: subText }]}>{d.historyText}</Text>
 
-              {/* 5-сегментный индикатор цвета напитка */}
-              <View style={[st.specRow, { borderBottomColor: lineCol }]}>
-                <Text style={[st.specLabel, { color: t.text }]}>Цвет напитка</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <Text style={[st.specVal, { color: t.textSecondary }]}>{meta.colorName}</Text>
-                  <View style={{ flexDirection: 'row', gap: 4 }}>
-                    {[1, 2, 3, 4, 5].map((lvl) => (
-                      <View
-                        key={lvl}
-                        style={[
-                          st.colorSegment,
-                          {
-                            backgroundColor:
-                              lvl <= meta.colorLevel
-                                ? '#CFA052'
-                                : isDark
-                                ? 'rgba(255,255,255,0.16)'
-                                : 'rgba(25,24,22,0.16)',
-                          },
-                        ]}
-                      />
-                    ))}
+                    <Text style={[st.goldSubTitle, { marginTop: 22 }]}>Стиль пива</Text>
+                    <Text style={[st.bodyText, { color: subText }]}>{d.styleText}</Text>
+                  </View>
+                  <View style={[st.popBox, { borderTopColor: lineCol, borderBottomColor: lineCol }]}>
+                    <Text style={st.popNum}>{d.popularity}</Text>
+                    <Text style={[st.popLabel, { color: mutedText }]}>Популярность сорта</Text>
                   </View>
                 </View>
               </View>
 
-              {/* Состав */}
-              <View style={st.compRow}>
-                <Text style={st.wheatIcon}>🌾</Text>
-                <Text style={[st.compText, { color: t.textSecondary }]}>
-                  <Text style={{ color: '#CFA052', fontFamily: 'Oswald_600SemiBold' }}>СОСТАВ: </Text>
-                  {meta.composition}
-                </Text>
-              </View>
-            </View>
+              {/* 3. ВКУС */}
+              <View
+                onLayout={(e) => { offsets.current.taste = e.nativeEvent.layout.y; }}
+                style={[st.sectionBlock, { borderTopWidth: 1, borderTopColor: lineCol, alignItems: 'center' }]}
+              >
+                <Text style={st.kicker}>СТАРШИЙ ТЕХНОЛОГ</Text>
+                <Text style={[st.quoteText, { color: mainText }]}>{d.tasteQuote}</Text>
 
-            {/* Еда-пейринг */}
-            <View style={[st.pairingBox, { backgroundColor: subSurface }]}>
-              <View style={{ flex: 1, paddingRight: 10 }}>
-                <Text style={st.pairingKicker}>ИДЕАЛЬНО К ЗАКУСКЕ</Text>
-                <Text style={[st.pairingName, { color: t.text }]}>{product.pairing.name}</Text>
-              </View>
-              <ScalePress onPress={() => onAddPairing(product)}>
-                <View style={st.pairingBtn}>
-                  <Text style={st.pairingBtnText}>+ {product.pairing.price} ₽</Text>
+                {/* Еда-пейринг внутри блока вкуса */}
+                <View style={[st.pairingCard, { borderColor: lineCol, backgroundColor: cardSurface }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={st.kicker}>ЕДА-ПЕЙРИНГ ОТ ТЕХНОЛОГА</Text>
+                    <Text style={[st.specKey, { color: themeMode === 'dark' && !isHeroDark ? '#FFFFFF' : '#1E1C1A', marginTop: 3 }]}>
+                      {product.pairing.name}
+                    </Text>
+                  </View>
+                  <ScalePress onPress={() => onAddPairing(product)}>
+                    <View style={st.pairingBtn}>
+                      <Text style={st.pairingBtnText}>+ {product.pairing.price} ₽</Text>
+                    </View>
+                  </ScalePress>
                 </View>
-              </ScalePress>
-            </View>
+              </View>
 
-            {/* Выбор объёма для разливного */}
+              {/* 4. КОМПОНЕНТЫ */}
+              <View
+                onLayout={(e) => { offsets.current.components = e.nativeEvent.layout.y; }}
+                style={[st.sectionBlock, { borderTopWidth: 1, borderTopColor: lineCol }]}
+              >
+                <Text style={st.kicker}>КОМПОНЕНТЫ И ХАРАКТЕРИСТИКИ</Text>
+                <View style={{ marginTop: 14 }}>
+                  {[
+                    ['Стиль', product.subtitle || 'Фирменный сорт'],
+                    ['Содержание алкоголя', product.is_alcohol ? `${product.abv.toFixed(1).replace('.', ',')}%` : '0,0%'],
+                    ['Экстрактивность нач. сусла', product.is_alcohol ? `${product.og}%` : '—'],
+                    ['Солод', d.malt],
+                    ['Хмель', d.hops],
+                    ['Калорийность в 100 см3', d.calories],
+                    ['Углеводы в 100 см3', d.carbs],
+                    ['Цвет', d.colorName],
+                    ['Срок годности', d.shelfLife],
+                  ].map(([k, v]) => (
+                    <View key={k} style={[st.compTableRow, { borderBottomColor: lineCol }]}>
+                      <Text style={[st.compTableKey, { color: mainText }]}>{k}</Text>
+                      <Text style={[st.compTableVal, { color: '#CFA052' }]}>{v}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+
+              {/* 5. ФОРМАТЫ */}
+              <View
+                onLayout={(e) => { offsets.current.formats = e.nativeEvent.layout.y; }}
+                style={[st.sectionBlock, { borderTopWidth: 1, borderTopColor: lineCol }]}
+              >
+                <View style={st.twoColWrap}>
+                  <Text style={[st.goldSubTitle, { flex: 1, fontSize: 18 }]}>Выберите удобный формат</Text>
+                  <Text style={[st.bodyText, { flex: 1.5, color: subText }]}>
+                    Настоящее пиво должно вариться рядом с тем местом, где оно будет питься. Поэтому наш
+                    продукт мы делаем для земляков.
+                  </Text>
+                </View>
+
+                <View style={st.formatsRow}>
+                  {d.formats.map((f) => {
+                    const active = f.product.id === product.id;
+                    return (
+                      <TouchableOpacity
+                        key={f.product.id}
+                        style={[
+                          st.formatCard,
+                          { borderColor: active ? '#CFA052' : lineCol },
+                          active && { backgroundColor: 'rgba(207,160,82,0.1)' },
+                        ]}
+                        onPress={() => onSelectProduct(f.product)}
+                      >
+                        <ContainerArt
+                          productId={f.product.id}
+                          type={f.product.container_type}
+                          visual={f.product.visual}
+                          height={96}
+                        />
+                        <View style={[st.formatDivider, { backgroundColor: lineCol }]} />
+                        <Text style={st.formatVol}>{f.label}</Text>
+                        <Text style={[st.formatSub, { color: mainText }]}>{f.sub}</Text>
+                        <Text style={[st.formatPrice, { color: mutedText }]}>
+                          {f.product.base_price} ₽{f.product.is_draft ? '/л' : ''}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* 6. ЛЕГЕНДА */}
+              <View
+                onLayout={(e) => { offsets.current.legend = e.nativeEvent.layout.y; }}
+                style={[st.sectionBlock, { borderTopWidth: 1, borderTopColor: lineCol }]}
+              >
+                <View style={[st.legendCard, { backgroundColor: cardSurface, borderColor: lineCol }]}>
+                  <Text
+                    style={[
+                      st.legendTitle,
+                      { color: themeMode === 'dark' && !isHeroDark ? '#FFFFFF' : '#1E1C1A' },
+                    ]}
+                  >
+                    {d.legendTitle}
+                  </Text>
+                  <Text
+                    style={[
+                      st.bodyText,
+                      {
+                        color: themeMode === 'dark' && !isHeroDark ? '#D0C9BF' : '#4A453F',
+                        marginTop: 12,
+                      },
+                    ]}
+                  >
+                    {d.legendText}
+                  </Text>
+                </View>
+              </View>
+
+              {/* 7. ТЕХНОЛОГИЯ */}
+              <View
+                onLayout={(e) => { offsets.current.technology = e.nativeEvent.layout.y; }}
+                style={[st.sectionBlock, { borderTopWidth: 1, borderTopColor: lineCol }]}
+              >
+                <View style={st.techBanner}>
+                  <Text style={st.techStamp}>КОНСЕРВЫ НЕ ПРОЙДУТ!</Text>
+                  <Text style={st.techHeading}>Наш продукт —{'\n'}наша совесть!</Text>
+                </View>
+
+                <View style={[st.twoColWrap, { marginTop: 14 }]}>
+                  <Text style={[st.bodyText, { flex: 1, color: subText }]}>
+                    Никаких порошков. Только естественное созревание. Технология производства всех сортов на
+                    «Золотой Сове» — классическая. Только натуральное сырьё и никакого постороннего
+                    вмешательства.
+                  </Text>
+                  <Text style={[st.bodyText, { flex: 1, color: subText }]}>
+                    Мы консерваторы во всём, что касается натуральности сырья, и новаторы во всём, что
+                    касается технологии. Все мы, сотрудники «Золотой Совы», живём рядом с вами в Кемерове.
+                  </Text>
+                </View>
+
+                <View style={st.principlesGrid}>
+                  {[
+                    ['1.', 'Никаких порошков'],
+                    ['2.', 'Натуральное сырьё'],
+                    ['3.', 'Консервативная технология'],
+                    ['4.', 'Современное оборудование'],
+                  ].map(([num, label]) => (
+                    <View key={num} style={st.principleItem}>
+                      <Text style={st.principleNum}>{num}</Text>
+                      <Text style={[st.principleText, { color: mainText }]}>{label}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+
+              {/* 8. ГДЕ КУПИТЬ */}
+              <View
+                onLayout={(e) => { offsets.current.buy = e.nativeEvent.layout.y; }}
+                style={[st.sectionBlock, { borderTopWidth: 1, borderTopColor: lineCol, paddingBottom: 110 }]}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <Text style={[st.sectionTitle, { color: mainText, marginBottom: 0 }]}>Где купить</Text>
+                  <View style={st.greenBadge}>
+                    <Text style={st.greenBadgeText}>{stores.length}</Text>
+                  </View>
+                  <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 12, color: '#CFA052' }}>
+                    Фирменных{'\n'}точек в Кемерове
+                  </Text>
+                </View>
+
+                <Text style={[st.goldSubTitle, { marginTop: 22 }]}>Магазины</Text>
+                <View style={st.storesGrid}>
+                  {brandStores.map((stItem) => {
+                    const active = stItem.id === selectedStore.id;
+                    return (
+                      <TouchableOpacity
+                        key={stItem.id}
+                        style={[st.storeCell, active && { backgroundColor: 'rgba(207,160,82,0.12)' }]}
+                        onPress={() => onSelectStore(stItem)}
+                      >
+                        <View style={st.storeGoldLine} />
+                        <Text style={[st.storeName, { color: mainText }]}>{stItem.name}</Text>
+                        <Text style={[st.storeAddr, { color: subText }]}>{stItem.address}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {deptStores.length > 0 && (
+                  <>
+                    <Text style={[st.goldSubTitle, { marginTop: 22 }]}>Фирменные отделы</Text>
+                    <View style={st.storesGrid}>
+                      {deptStores.map((stItem) => {
+                        const active = stItem.id === selectedStore.id;
+                        return (
+                          <TouchableOpacity
+                            key={stItem.id}
+                            style={[st.storeCell, active && { backgroundColor: 'rgba(207,160,82,0.12)' }]}
+                            onPress={() => onSelectStore(stItem)}
+                          >
+                            <View style={st.storeGoldLine} />
+                            <Text style={[st.storeName, { color: mainText }]}>{stItem.name}</Text>
+                            <Text style={[st.storeAddr, { color: subText }]}>{stItem.address}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </>
+                )}
+              </View>
+            </ScrollView>
+
+            {/* Правая вертикальная кнопка переключения на следующий сорт (на широких экранах) */}
+            {isWide && nextProduct && (
+              <TouchableOpacity
+                style={st.edgeNavRight}
+                onPress={() => onSelectProduct(nextProduct)}
+              >
+                <Text style={[st.edgeNavText, { color: mutedText }]} numberOfLines={1}>
+                  {nextProduct.name.toUpperCase()} ›
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Нижняя панель заказа */}
+          <View style={[st.bottomBar, { borderTopColor: lineCol, backgroundColor: pageBg }]}>
             {product.is_draft && (
               <View style={st.volRow}>
                 {[0.5, 1.0, 1.5].map((v) => {
@@ -301,260 +624,194 @@ export function ProductModal({
                     <TouchableOpacity
                       key={v}
                       style={[
-                        st.volBtn,
+                        st.volChip,
                         { borderColor: active ? '#CFA052' : lineCol },
                         active && { backgroundColor: '#CFA052' },
                       ]}
                       onPress={() => onChangeVolume(v)}
                     >
-                      <Text style={[st.volText, { color: active ? '#191816' : t.text }]}>{v} л</Text>
+                      <Text style={[st.volChipText, { color: active ? '#191816' : mainText }]}>{v} л</Text>
                     </TouchableOpacity>
                   );
                 })}
               </View>
             )}
-          </ScrollView>
-
-          {/* Кнопки действий */}
-          <View style={st.actions}>
-            <TouchableOpacity style={[st.closeBtn, { borderColor: lineCol }]} onPress={onClose}>
-              <Text style={[st.closeBtnText, { color: t.text }]}>ЗАКРЫТЬ</Text>
-            </TouchableOpacity>
             <TouchableOpacity style={st.addBtn} onPress={() => onAddProduct(product, draftVolume)}>
               <Text style={st.addBtnText}>В КОРЗИНУ • {finalPrice} ₽</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
 
 const st = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(10, 9, 8, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 14,
-  },
-  card: {
-    width: '100%',
-    maxWidth: 620,
-    maxHeight: '90%',
-    borderWidth: 1,
-    padding: 18,
-  },
-  topBar: {
+  root: { flex: 1 },
+  topHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: 10,
-    marginBottom: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
     borderBottomWidth: 1,
   },
-  navPill: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(207, 160, 82, 0.4)',
-  },
-  navPillText: {
-    fontFamily: 'Oswald_500Medium',
-    fontSize: 11,
-    color: '#CFA052',
-    letterSpacing: 0.8,
-  },
-  brandLabel: {
-    fontFamily: 'Oswald_500Medium',
-    fontSize: 10,
-    letterSpacing: 1.2,
-  },
-  closeX: {
-    fontSize: 17,
-    paddingHorizontal: 4,
-  },
-  heroRow: {
+  topHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  topLink: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  topLinkText: { fontFamily: 'Oswald_500Medium', fontSize: 11, letterSpacing: 1.2 },
+  dotsGrid: {
+    width: 12,
+    height: 12,
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
+    alignContent: 'space-between',
   },
-  heroLeft: {
-    flex: 1,
-    paddingRight: 10,
-  },
-  kicker: {
-    fontFamily: 'Oswald_500Medium',
-    fontSize: 10,
-    color: '#CFA052',
-    letterSpacing: 1.5,
-  },
-  bigBadge: {
-    fontFamily: 'Oswald_600SemiBold',
-    fontSize: 34,
-    lineHeight: 38,
-    marginTop: 2,
-  },
-  title: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 20,
-    lineHeight: 25,
-    marginTop: 6,
-  },
-  subtitle: {
-    fontFamily: 'Oswald_400Regular',
-    fontSize: 12,
-    color: '#CFA052',
-    marginTop: 3,
-    letterSpacing: 0.6,
-  },
-  bottleStage: {
-    width: 145,
-    height: 175,
+  dotSq: { width: 4, height: 4 },
+  closeCircle: {
+    width: 32,
+    height: 32,
+    borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  haloOuter: {
-    position: 'absolute',
-    width: 136,
-    height: 136,
-    borderRadius: 68,
-    backgroundColor: 'rgba(207, 160, 82, 0.1)',
-  },
-  haloInner: {
-    position: 'absolute',
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    backgroundColor: 'rgba(207, 160, 82, 0.16)',
-  },
-  desc: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-    lineHeight: 19,
-    marginTop: 10,
-  },
-  specsBox: {
-    marginTop: 14,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-  },
+  closeCircleText: { fontSize: 15 },
+
+  leftCol: { width: 250, position: 'relative', justifyContent: 'flex-start' },
+  edgeNavLeft: { position: 'absolute', left: 10, top: '46%', zIndex: 5, maxWidth: 130 },
+  edgeNavRight: { width: 44, justifyContent: 'center', alignItems: 'center' },
+  edgeNavText: { fontFamily: 'Oswald_500Medium', fontSize: 10, letterSpacing: 1.4 },
+
+  kicker: { fontFamily: 'Oswald_500Medium', fontSize: 11, color: '#CFA052', letterSpacing: 1.6 },
+  bigNumber: { fontFamily: 'Oswald_600SemiBold', fontSize: 56, lineHeight: 62, marginTop: 4 },
+  sideMenuItem: { flexDirection: 'row', alignItems: 'center' },
+  sideDash: { width: 14, height: 1.5, backgroundColor: '#CFA052', marginRight: 8 },
+  sideMenuText: { fontFamily: 'Oswald_500Medium', fontSize: 11, letterSpacing: 1.3 },
+
+  centerBottleCol: { width: 240, justifyContent: 'center', alignItems: 'center' },
+
+  scrollContent: { paddingBottom: 30 },
+  sectionBlock: { paddingVertical: 30 },
+  mobileHeroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  heroTitle: { fontFamily: 'Inter_700Bold', fontSize: 32, lineHeight: 38, marginBottom: 18 },
+  specTable: { borderTopWidth: 1 },
   specRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 9,
+    paddingVertical: 11,
     borderBottomWidth: 1,
     flexWrap: 'wrap',
-    gap: 6,
-  },
-  specLabel: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 12,
-  },
-  specStrong: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 13,
-  },
-  specVal: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-  },
-  colorSegment: {
-    width: 16,
-    height: 4,
-    borderRadius: 2,
-  },
-  compRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: 10,
     gap: 8,
   },
-  wheatIcon: {
-    fontSize: 15,
-    marginTop: 1,
+  halfCell: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 6 },
+  specKey: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
+  specVal: { fontFamily: 'Inter_400Regular', fontSize: 13 },
+  colorSeg: { width: 18, height: 4, borderRadius: 2 },
+  compBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 14, borderBottomWidth: 1 },
+  compText: { flex: 1, fontFamily: 'Oswald_400Regular', fontSize: 12, lineHeight: 18, letterSpacing: 0.4 },
+
+  downCue: { alignItems: 'center', marginTop: 26 },
+  downCueText: { fontFamily: 'Oswald_500Medium', fontSize: 10, color: '#CFA052', letterSpacing: 1.6, marginBottom: 10 },
+  downCueLine: { width: 1.5, height: 34, backgroundColor: '#CFA052' },
+  downCueCircle: { width: 14, height: 14, borderRadius: 7, borderWidth: 1, borderColor: '#CFA052', marginTop: -5 },
+
+  sectionTitle: { fontFamily: 'Inter_700Bold', fontSize: 28, marginBottom: 18 },
+  goldSubTitle: { fontFamily: 'Inter_700Bold', fontSize: 15, color: '#CFA052', marginBottom: 8 },
+  bodyText: { fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 20 },
+  twoColWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 18 },
+  popBox: {
+    minWidth: 120,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    paddingVertical: 12,
+    alignSelf: 'flex-start',
   },
-  compText: {
-    flex: 1,
-    fontFamily: 'Oswald_400Regular',
-    fontSize: 11,
-    lineHeight: 16,
-    letterSpacing: 0.4,
+  popNum: { fontFamily: 'Oswald_600SemiBold', fontSize: 24, color: '#CFA052' },
+  popLabel: { fontFamily: 'Inter_400Regular', fontSize: 11, marginTop: 4 },
+
+  quoteText: {
+    fontFamily: 'Oswald_500Medium',
+    fontSize: 22,
+    lineHeight: 30,
+    textAlign: 'center',
+    letterSpacing: 1,
+    marginTop: 12,
   },
-  pairingBox: {
+  pairingCard: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 11,
-    marginTop: 12,
+    padding: 14,
+    marginTop: 22,
+    borderWidth: 1,
     borderLeftWidth: 3,
     borderLeftColor: '#CFA052',
   },
-  pairingKicker: {
-    fontFamily: 'Oswald_600SemiBold',
-    fontSize: 10,
-    color: '#CFA052',
-    letterSpacing: 1,
-  },
-  pairingName: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
-    marginTop: 2,
-  },
-  pairingBtn: {
-    backgroundColor: '#191816',
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderWidth: 1,
-    borderColor: '#CFA052',
-  },
-  pairingBtnText: {
-    fontFamily: 'Oswald_500Medium',
-    fontSize: 11,
-    color: '#D89F5C',
-  },
-  volRow: {
+  pairingBtn: { backgroundColor: '#191816', paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#CFA052' },
+  pairingBtnText: { fontFamily: 'Oswald_500Medium', fontSize: 12, color: '#CFA052' },
+
+  compTableRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginTop: 12,
+    justifyContent: 'space-between',
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    gap: 12,
   },
-  volBtn: {
+  compTableKey: { fontFamily: 'Inter_600SemiBold', fontSize: 13, flex: 1 },
+  compTableVal: { fontFamily: 'Inter_400Regular', fontSize: 13, flex: 1, textAlign: 'right' },
+
+  formatsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 18 },
+  formatCard: {
     flex: 1,
+    minWidth: 110,
     borderWidth: 1,
-    paddingVertical: 9,
+    padding: 12,
     alignItems: 'center',
   },
-  volText: {
-    fontFamily: 'Oswald_500Medium',
-    fontSize: 12,
+  formatDivider: { width: '100%', height: 1, marginVertical: 10 },
+  formatVol: { fontFamily: 'Oswald_600SemiBold', fontSize: 16, color: '#CFA052' },
+  formatSub: { fontFamily: 'Inter_600SemiBold', fontSize: 12, marginTop: 2 },
+  formatPrice: { fontFamily: 'Inter_400Regular', fontSize: 11, marginTop: 4 },
+
+  legendCard: { padding: 24, borderWidth: 1 },
+  legendTitle: { fontFamily: 'Oswald_600SemiBold', fontSize: 20, letterSpacing: 1.5, textAlign: 'center' },
+
+  techBanner: { borderLeftWidth: 3, borderLeftColor: '#CFA052', paddingLeft: 14 },
+  techStamp: { fontFamily: 'Oswald_600SemiBold', fontSize: 11, color: '#CFA052', letterSpacing: 1.8 },
+  techHeading: { fontFamily: 'Inter_700Bold', fontSize: 24, color: '#CFA052', lineHeight: 30, marginTop: 4 },
+  principlesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 20 },
+  principleItem: { width: '46%', flexDirection: 'row', alignItems: 'center', gap: 8 },
+  principleNum: { fontFamily: 'Oswald_600SemiBold', fontSize: 22, color: '#CFA052' },
+  principleText: { fontFamily: 'Inter_600SemiBold', fontSize: 12, flex: 1 },
+
+  greenBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#194D33',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  actions: {
+  greenBadgeText: { fontFamily: 'Inter_700Bold', fontSize: 13, color: '#CFA052' },
+  storesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  storeCell: { width: '47%', paddingVertical: 8, paddingHorizontal: 6 },
+  storeGoldLine: { height: 1, backgroundColor: '#CFA052', marginBottom: 8 },
+  storeName: { fontFamily: 'Inter_700Bold', fontSize: 12 },
+  storeAddr: { fontFamily: 'Inter_400Regular', fontSize: 12, marginTop: 3 },
+
+  bottomBar: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 10,
-    marginTop: 14,
-  },
-  closeBtn: {
-    borderWidth: 1,
-    paddingVertical: 13,
     paddingHorizontal: 16,
-    justifyContent: 'center',
+    paddingVertical: 12,
+    borderTopWidth: 1,
   },
-  closeBtnText: {
-    fontFamily: 'Oswald_600SemiBold',
-    fontSize: 13,
-  },
-  addBtn: {
-    flex: 1,
-    backgroundColor: '#CFA052',
-    paddingVertical: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addBtnText: {
-    fontFamily: 'Oswald_600SemiBold',
-    fontSize: 14,
-    color: '#191816',
-    letterSpacing: 1,
-  },
+  volRow: { flexDirection: 'row', gap: 6 },
+  volChip: { borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10 },
+  volChipText: { fontFamily: 'Oswald_500Medium', fontSize: 12 },
+  addBtn: { flex: 1, backgroundColor: '#CFA052', paddingVertical: 13, alignItems: 'center' },
+  addBtnText: { fontFamily: 'Oswald_600SemiBold', fontSize: 14, color: '#191816', letterSpacing: 1 },
 });
