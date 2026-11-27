@@ -254,41 +254,22 @@ export function ProductModal({
   const isDark = themeMode === 'dark';
   const finalPrice = product.is_draft ? Math.round(product.base_price * draftVolume) : product.base_price;
 
-  // Плавная интерполяция с учётом текущей темы приложения (dark или light)
-  const targetBg = isDark ? '#191816' : '#F3EEE8';
-  const transitionEnd = Math.max(260, slideH * 0.65);
+  // Статичная палитра текущей темы без смены цветов при прокрутке
+  const bgInterp = isDark ? "#191816" : "#F3EEE8";
+  const badgeColorInterp = "#CFA052";
 
-  const bgInterp = scrollY.interpolate({
-    inputRange: [0, transitionEnd * 0.35, transitionEnd],
-    outputRange: ['#342014', '#342014', targetBg],
-    extrapolate: 'clamp',
-  });
-  const badgeColorInterp = scrollY.interpolate({
-    inputRange: [0, transitionEnd * 0.35, transitionEnd],
-    outputRange: ['#FFFFFF', '#FFFFFF', '#CFA052'],
-    extrapolate: 'clamp',
-  });
-  const peekOpacity = scrollY.interpolate({
-    inputRange: [transitionEnd * 0.35, transitionEnd],
-    outputRange: [0, isDark ? 0.22 : 0.34],
-    extrapolate: 'clamp',
-  });
+  const bodyText = isDark ? "#FFFFFF" : "#1E1C1A";
+  const bodySub = isDark ? "#CEC7BD" : "#524D47";
+  const bodyMuted = isDark ? "#9A9287" : "#8C8378";
+  const bodyLine = isDark ? "rgba(207, 160, 82, 0.22)" : "rgba(25, 24, 22, 0.14)";
+  const cardBg = isDark ? "#23201D" : "#FFFFFF";
 
-  // Палитра первого экрана («Описание» — всегда фирменный шоколадный)
-  const heroText = '#FFFFFF';
-  const heroMuted = '#C4B3A3';
-  const heroLine = 'rgba(207, 160, 82, 0.38)';
-
-  // Палитра остальных разделов (подстраивается под тёмную или светлую тему)
-  const bodyText = isDark ? '#FFFFFF' : '#1E1C1A';
-  const bodySub = isDark ? '#CEC7BD' : '#524D47';
-  const bodyMuted = isDark ? '#9A9287' : '#8C8378';
-  const bodyLine = isDark ? 'rgba(207, 160, 82, 0.22)' : 'rgba(25, 24, 22, 0.14)';
-  const cardBg = isDark ? '#23201D' : '#FFFFFF';
-
-  const chromeText = isPastHero ? bodyText : heroText;
-  const chromeMuted = isPastHero ? bodyMuted : heroMuted;
-  const chromeLine = isPastHero ? bodyLine : heroLine;
+  const heroText = bodyText;
+  const heroMuted = bodyMuted;
+  const heroLine = bodyLine;
+  const chromeText = bodyText;
+  const chromeMuted = bodyMuted;
+  const chromeLine = bodyLine;
 
   const brandStores = stores.filter((s) => s.name.includes('GOLD SOVA'));
   const deptStores = stores.filter((s) => !s.name.includes('GOLD SOVA'));
@@ -301,12 +282,7 @@ export function ProductModal({
 
   function handleScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
     const y = e.nativeEvent.contentOffset.y;
-    scrollY.setValue(y);
-
-    const past = y > transitionEnd * 0.65;
-    if (past !== isPastHero) setIsPastHero(past);
-
-    let current: SectionId = 'desc';
+    let current: SectionId = "desc";
     for (const sec of SECTIONS) {
       const top = offsets.current[sec.id];
       if (top !== undefined && y + 180 >= top) current = sec.id;
@@ -505,7 +481,7 @@ export function ProductModal({
                                 key={lvl}
                                 style={[
                                   st.colorSeg,
-                                  { backgroundColor: lvl <= d.colorLevel ? '#CFA052' : 'rgba(255,255,255,0.2)' },
+                                  { backgroundColor: lvl <= d.colorLevel ? '#CFA052' : 'rgba(160,150,140,0.28)' },
                                 ]}
                               />
                             ))}
